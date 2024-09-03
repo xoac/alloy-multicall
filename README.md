@@ -21,7 +21,7 @@ use alloy_primitives::{address, U256};
 use alloy_dyn_abi::DynSolValue;
 
 sol! {
-    #[derive(Debug, PartialEq)]
+    #[derive(Debug)]
     #[sol(abi)]
     function getAmountsOut(uint amountIn, address[] memory path)
         public
