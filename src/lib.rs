@@ -1,3 +1,4 @@
+pub use error::MulticallError;
 pub use middleware::*;
 
 mod constants;
