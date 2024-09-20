@@ -1,10 +1,10 @@
 use crate::{
-    error::MulticallError,
     constants,
     contract::IMulticall3::{self, IMulticall3Instance},
+    error::MulticallError,
 };
 use alloy_contract::{
-    private::{Transport, Network},
+    private::{Network, Transport},
     CallBuilder, CallDecoder,
 };
 
@@ -17,7 +17,6 @@ use IMulticall3::Result as MulticallResult;
 
 /// Alias for [std::result::Result]<T, [MulticallError]>
 pub type Result<T> = std::result::Result<T, MulticallError>;
-
 
 /// An individual call within a multicall
 #[derive(Debug, Clone)]
@@ -33,7 +32,12 @@ pub struct Call {
 }
 
 impl Call {
-    pub fn build_call(target: Address, func: &Function, args: &[DynSolValue], allow_failure: bool) -> Self {
+    pub fn build_call(
+        target: Address,
+        func: &Function,
+        args: &[DynSolValue],
+        allow_failure: bool,
+    ) -> Self {
         Self {
             target,
             calldata: func.abi_encode_input(args).unwrap().into(),
@@ -77,7 +81,9 @@ impl TryFrom<u8> for MulticallVersion {
             1 => Ok(MulticallVersion::Multicall),
             2 => Ok(MulticallVersion::Multicall2),
             3 => Ok(MulticallVersion::Multicall3),
-            _ => Err(format!("Invalid Multicall version: {v}. Accepted values: 1, 2, 3.")),
+            _ => Err(format!(
+                "Invalid Multicall version: {v}. Accepted values: 1, 2, 3."
+            )),
         }
     }
 }
@@ -98,8 +104,6 @@ impl MulticallVersion {
         matches!(self, Self::Multicall3)
     }
 }
-
-
 
 #[derive(Debug, Clone)]
 #[must_use = "Multicall does nothing unless you use `call`"]
@@ -144,8 +148,7 @@ where
                 let chain_id = provider
                     .get_chain_id()
                     .await
-                    .map_err(MulticallError::TransportError)?
-                    .into();
+                    .map_err(MulticallError::TransportError)?;
 
                 if !constants::MULTICALL_SUPPORTED_CHAINS.contains(&chain_id) {
                     return Err(MulticallError::InvalidChainId(chain_id));
@@ -157,7 +160,11 @@ where
         // Create the multicall contract
         let contract = IMulticall3::new(address, provider);
 
-        Ok(Self { calls: vec![], contract, version: MulticallVersion::Multicall3 })
+        Ok(Self {
+            calls: vec![],
+            contract,
+            version: MulticallVersion::Multicall3,
+        })
     }
 
     /// Synchronously creates a new [Multicall] instance from the given provider.
@@ -194,7 +201,11 @@ where
         // Create the multicall contract
         let contract = IMulticall3::new(address, provider);
 
-        Ok(Self { calls: vec![], contract, version: MulticallVersion::Multicall3 })
+        Ok(Self {
+            calls: vec![],
+            contract,
+            version: MulticallVersion::Multicall3,
+        })
     }
 
     /// Sets the [MulticallVersion] which is used to determine which functions to use when making
@@ -208,8 +219,8 @@ where
     ///   allowed to fail.
     ///
     /// - Multicall2 (v2): The same as Multicall, but provides additional methods that allow either
-    /// all or no calls within the batch to fail. Included for backward compatibility. Use v3 to
-    /// allow failure on a per-call basis.
+    ///   all or no calls within the batch to fail. Included for backward compatibility. Use v3 to
+    ///   allow failure on a per-call basis.
     ///
     /// - Multicall3 (v3): This is the recommended version, which is backwards compatible with both
     ///   Multicall & Multicall2. It provides additional methods for specifying whether calls are
@@ -249,26 +260,35 @@ where
     /// - `3`: `allow_failure` specifies whether or not this call is allowed to revert in the
     ///   multicall. This is on a per-call basis, however if this is `false` for an individual call
     ///   and the call reverts, then this will cause the entire multicall to revert.
-    pub fn add_call(&mut self, target: Address, func: &Function, args: &[DynSolValue], allow_failure: bool) {
+    pub fn add_call(
+        &mut self,
+        target: Address,
+        func: &Function,
+        args: &[DynSolValue],
+        allow_failure: bool,
+    ) {
         let call = Call::build_call(target, func, args, allow_failure);
 
         self.calls.push(call)
     }
 
-
     /// Builder pattern to add a [Call] to the internal calls vector and return the [Multicall]. See
     /// [`add_call`] for more details.
     ///
     /// [`add_call`]: #method.add_call
-    pub fn with_call(&mut self, target: Address, func: &Function, args: &[DynSolValue], allow_failure: bool) -> &mut Self {
+    pub fn with_call(
+        &mut self,
+        target: Address,
+        func: &Function,
+        args: &[DynSolValue],
+        allow_failure: bool,
+    ) -> &mut Self {
         let call = Call::build_call(target, func, args, allow_failure);
 
         self.calls.push(call);
 
         self
     }
-
-
 
     /// Returns the current instantiated [Multicall] instance with an empty `calls` vector.
     /// This allows the user to reuse the instance to perform another aggregate query.
@@ -295,12 +315,12 @@ where
 
                 let multicall_result = call.call().await?;
 
-                self.parse_multicall_result(
-                    multicall_result.returnData.into_iter().map(|return_data| MulticallResult {
+                self.parse_multicall_result(multicall_result.returnData.into_iter().map(
+                    |return_data| MulticallResult {
                         success: true,
                         returnData: return_data,
-                    }),
-                )
+                    },
+                ))
             }
 
             MulticallVersion::Multicall2 => {
@@ -331,7 +351,12 @@ where
 
         let get_block_hash_function = functions.get("getBlockHash").unwrap().first().unwrap();
 
-        self.with_call(*self.contract.address(), get_block_hash_function, &[DynSolValue::from(block_number.into())], false)
+        self.with_call(
+            *self.contract.address(),
+            get_block_hash_function,
+            &[DynSolValue::from(block_number.into())],
+            false,
+        )
     }
 
     /// Appends a `call` to the list of calls of the Multicall instance for querying the current
@@ -339,9 +364,14 @@ where
     pub fn add_get_block_number(&mut self) -> &mut Self {
         let functions = IMulticall3::abi::functions();
 
-        let get_block_hash_function = functions.get("getBlockNumber").unwrap().first().unwrap();      
+        let get_block_hash_function = functions.get("getBlockNumber").unwrap().first().unwrap();
 
-        self.with_call(*self.contract.address(), get_block_hash_function, &[], false)
+        self.with_call(
+            *self.contract.address(),
+            get_block_hash_function,
+            &[],
+            false,
+        )
     }
 
     /// Appends a `call` to the list of calls of the Multicall instance for querying the current
@@ -349,10 +379,18 @@ where
     pub fn add_get_current_block_coinbase(&mut self) -> &mut Self {
         let functions = IMulticall3::abi::functions();
 
-        let get_block_hash_function =
-            functions.get("getCurrentBlockCoinbase").unwrap().first().unwrap();
+        let get_block_hash_function = functions
+            .get("getCurrentBlockCoinbase")
+            .unwrap()
+            .first()
+            .unwrap();
 
-        self.with_call(*self.contract.address(), get_block_hash_function, &[], false)
+        self.with_call(
+            *self.contract.address(),
+            get_block_hash_function,
+            &[],
+            false,
+        )
     }
 
     /// Appends a `call` to the list of calls of the Multicall instance for querying the current
@@ -364,10 +402,18 @@ where
     pub fn add_get_current_block_difficulty(&mut self) -> &mut Self {
         let functions = IMulticall3::abi::functions();
 
-        let get_block_hash_function =
-            functions.get("getCurrentBlockDifficulty").unwrap().first().unwrap();
+        let get_block_hash_function = functions
+            .get("getCurrentBlockDifficulty")
+            .unwrap()
+            .first()
+            .unwrap();
 
-        self.with_call(*self.contract.address(), get_block_hash_function, &[], false)
+        self.with_call(
+            *self.contract.address(),
+            get_block_hash_function,
+            &[],
+            false,
+        )
     }
 
     /// Appends a `call` to the list of calls of the Multicall instance for querying the current
@@ -375,10 +421,18 @@ where
     pub fn add_get_current_block_gas_limit(&mut self) -> &mut Self {
         let functions = IMulticall3::abi::functions();
 
-        let get_block_hash_function =
-            functions.get("getCurrentBlockGasLimit").unwrap().first().unwrap();
+        let get_block_hash_function = functions
+            .get("getCurrentBlockGasLimit")
+            .unwrap()
+            .first()
+            .unwrap();
 
-        self.with_call(*self.contract.address(), get_block_hash_function, &[], false)
+        self.with_call(
+            *self.contract.address(),
+            get_block_hash_function,
+            &[],
+            false,
+        )
     }
 
     /// Appends a `call` to the list of calls of the Multicall instance for querying the current
@@ -386,10 +440,18 @@ where
     pub fn add_get_current_block_timestamp(&mut self) -> &mut Self {
         let functions = IMulticall3::abi::functions();
 
-        let get_block_hash_function =
-            functions.get("getCurrentBlockTimestamp").unwrap().first().unwrap();
+        let get_block_hash_function = functions
+            .get("getCurrentBlockTimestamp")
+            .unwrap()
+            .first()
+            .unwrap();
 
-        self.with_call(*self.contract.address(), get_block_hash_function, &[], false)
+        self.with_call(
+            *self.contract.address(),
+            get_block_hash_function,
+            &[],
+            false,
+        )
     }
 
     /// Appends a `call` to the list of calls of the Multicall instance for querying the ETH
@@ -399,7 +461,12 @@ where
 
         let get_block_hash_function = functions.get("getEthBalance").unwrap().first().unwrap();
 
-        self.with_call(*self.contract.address(), get_block_hash_function, &[DynSolValue::from(address.into())], false)
+        self.with_call(
+            *self.contract.address(),
+            get_block_hash_function,
+            &[DynSolValue::from(address.into())],
+            false,
+        )
     }
 
     /// Appends a `call` to the list of calls of the Multicall instance for querying the last
@@ -409,7 +476,12 @@ where
 
         let get_block_hash_function = functions.get("getLastBlockHash").unwrap().first().unwrap();
 
-        self.with_call(*self.contract.address(), get_block_hash_function, &[], false)
+        self.with_call(
+            *self.contract.address(),
+            get_block_hash_function,
+            &[],
+            false,
+        )
     }
 
     /// Appends a `call` to the list of calls of the Multicall instance for querying the current
@@ -422,7 +494,12 @@ where
 
         let get_block_hash_function = functions.get("getBasefee").unwrap().first().unwrap();
 
-        self.with_call(*self.contract.address(), get_block_hash_function, &[], allow_failure)
+        self.with_call(
+            *self.contract.address(),
+            get_block_hash_function,
+            &[],
+            allow_failure,
+        )
     }
 
     /// Appends a `call` to the list of calls of the Multicall instance for querying the last
@@ -432,7 +509,12 @@ where
 
         let get_block_hash_function = functions.get("getChainId").unwrap().first().unwrap();
 
-        self.with_call(*self.contract.address(), get_block_hash_function, &[], false)
+        self.with_call(
+            *self.contract.address(),
+            get_block_hash_function,
+            &[],
+            false,
+        )
     }
 
     /// Uses the Multicall `aggregate(Call[] calldata calls)` method which returns a tuple of
@@ -446,7 +528,10 @@ where
             .calls
             .clone()
             .into_iter()
-            .map(|call| IMulticall3::Call { target: call.target, callData: call.calldata })
+            .map(|call| IMulticall3::Call {
+                target: call.target,
+                callData: call.calldata,
+            })
             .collect::<Vec<IMulticall3::Call>>();
 
         self.contract.aggregate(calls)
@@ -472,7 +557,10 @@ where
                 // `tryAggregate` contract call reverts if any of the individual calls revert.
                 allow_failure &= call.allow_failure;
 
-                IMulticall3::Call { target: call.target, callData: call.calldata }
+                IMulticall3::Call {
+                    target: call.target,
+                    callData: call.calldata,
+                }
             })
             .collect::<Vec<IMulticall3::Call>>();
 
@@ -528,7 +616,14 @@ where
 
         let mut results = Vec::with_capacity(self.calls.len());
 
-        for (call, MulticallResult { success, returnData }) in self.calls.iter().zip(iter) {
+        for (
+            call,
+            MulticallResult {
+                success,
+                returnData,
+            },
+        ) in self.calls.iter().zip(iter)
+        {
             // TODO - should empty return data also be considered a call failure, and returns an
             // error when allow_failure = false?
 
@@ -588,11 +683,10 @@ mod tests {
         }
     }
 
-
     #[tokio::test]
     async fn test_create_multicall() {
         let rpc_url = "https://rpc.ankr.com/eth".parse().unwrap();
-        let provider = alloy_provider::ProviderBuilder::new().on_http(rpc_url);        
+        let provider = alloy_provider::ProviderBuilder::new().on_http(rpc_url);
 
         // New Multicall with default address 0xcA11bde05977b3631167028862bE2a173976CA11
         let multicall = Multicall::new(&provider, None).await.unwrap();
@@ -600,38 +694,35 @@ mod tests {
 
         // New Multicall with user provided address
         let multicall_address = Address::ZERO;
-        let multicall = Multicall::new(&provider, Some(multicall_address)).await.unwrap();
+        let multicall = Multicall::new(&provider, Some(multicall_address))
+            .await
+            .unwrap();
         assert_eq!(multicall.contract.address(), &multicall_address);
     }
 
     #[tokio::test]
     async fn test_multicall_weth() {
         let rpc_url = "https://rpc.ankr.com/eth".parse().unwrap();
-        let provider = alloy_provider::ProviderBuilder::new().on_http(rpc_url);            
+        let provider = alloy_provider::ProviderBuilder::new().on_http(rpc_url);
         let weth_address = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
 
         // Create the multicall instance
         let mut multicall = Multicall::new(provider.clone(), None).await.unwrap();
 
-
         // Generate the WETH ERC20 instance we'll be using to create the individual calls
         let functions = ERC20::abi::functions();
-
 
         // Create the individual calls
         let name_call = functions.get("name").unwrap().first().unwrap();
         let total_supply_call = functions.get("totalSupply").unwrap().first().unwrap();
         let decimals_call = functions.get("decimals").unwrap().first().unwrap();
         let symbol_call = functions.get("symbol").unwrap().first().unwrap();
-        
 
         // Add the calls
-        multicall.add_call(weth_address, total_supply_call, &[], true);  
-        multicall.add_call(weth_address, name_call, &[], true);  
-        multicall.add_call(weth_address, decimals_call, &[], true);  
-        multicall.add_call(weth_address, symbol_call, &[], true);        
-
-
+        multicall.add_call(weth_address, total_supply_call, &[], true);
+        multicall.add_call(weth_address, name_call, &[], true);
+        multicall.add_call(weth_address, decimals_call, &[], true);
+        multicall.add_call(weth_address, symbol_call, &[], true);
 
         // Add the same calls via the builder pattern
         multicall
@@ -639,9 +730,7 @@ mod tests {
             .with_call(weth_address, name_call, &[], true)
             .with_call(weth_address, decimals_call, &[], true)
             .with_call(weth_address, symbol_call, &[], true)
-            .add_get_chain_id();        
-
-
+            .add_get_chain_id();
 
         // Send and await the multicall results
 
@@ -664,7 +753,7 @@ mod tests {
     #[tokio::test]
     async fn test_multicall_specific_methods() {
         let rpc_url = "https://rpc.ankr.com/eth".parse().unwrap();
-        let provider = alloy_provider::ProviderBuilder::new().on_http(rpc_url);                    
+        let provider = alloy_provider::ProviderBuilder::new().on_http(rpc_url);
         let mut multicall = Multicall::new(provider, None).await.unwrap();
 
         multicall
@@ -681,16 +770,40 @@ mod tests {
 
         let results = multicall.call().await.unwrap();
 
-        let chain_id = results.get(3).unwrap().as_ref().unwrap().as_uint().unwrap().0.to::<u64>();
-        let gas_limit = results.get(6).unwrap().as_ref().unwrap().as_uint().unwrap().0.to::<u64>();
-        let eth_balance =
-            format_ether(results.get(9).unwrap().as_ref().unwrap().as_uint().unwrap().0)
-                .split('.')
-                .collect::<Vec<&str>>()
-                .first()
+        let chain_id = results
+            .get(3)
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .as_uint()
+            .unwrap()
+            .0
+            .to::<u64>();
+        let gas_limit = results
+            .get(6)
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .as_uint()
+            .unwrap()
+            .0
+            .to::<u64>();
+        let eth_balance = format_ether(
+            results
+                .get(9)
                 .unwrap()
-                .parse::<u64>()
-                .unwrap();
+                .as_ref()
+                .unwrap()
+                .as_uint()
+                .unwrap()
+                .0,
+        )
+        .split('.')
+        .collect::<Vec<&str>>()
+        .first()
+        .unwrap()
+        .parse::<u64>()
+        .unwrap();
 
         assert_eq!(chain_id, 1); // Provider forked from Mainnet should always have chain ID 1
         assert_eq!(gas_limit, 30_000_000); // Mainnet gas limit is 30m
@@ -702,7 +815,15 @@ mod tests {
     fn assert_results(results: Vec<StdResult<DynSolValue, Bytes>>) {
         // Get the expected individual results.
         let name = results.get(1).unwrap().as_ref().unwrap().as_str().unwrap();
-        let decimals = results.get(2).unwrap().as_ref().unwrap().as_uint().unwrap().0.to::<u8>();
+        let decimals = results
+            .get(2)
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .as_uint()
+            .unwrap()
+            .0
+            .to::<u8>();
         let symbol = results.get(3).unwrap().as_ref().unwrap().as_str().unwrap();
 
         // Assert the returned results are as expected
@@ -712,9 +833,25 @@ mod tests {
 
         // Also check the calls that were added via the builder pattern
         let name = results.get(5).unwrap().as_ref().unwrap().as_str().unwrap();
-        let decimals = results.get(6).unwrap().as_ref().unwrap().as_uint().unwrap().0.to::<u8>();
+        let decimals = results
+            .get(6)
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .as_uint()
+            .unwrap()
+            .0
+            .to::<u8>();
         let symbol = results.get(7).unwrap().as_ref().unwrap().as_str().unwrap();
-        let chain_id = results.get(8).unwrap().as_ref().unwrap().as_uint().unwrap().0.to::<u64>();
+        let chain_id = results
+            .get(8)
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .as_uint()
+            .unwrap()
+            .0
+            .to::<u64>();
 
         assert_eq!(name, "Wrapped Ether");
         assert_eq!(symbol, "WETH");
