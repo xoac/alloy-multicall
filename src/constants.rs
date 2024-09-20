@@ -105,6 +105,7 @@ pub const MULTICALL_SUPPORTED_CHAINS: &[u64] = {
         1131,                // DeFiChain EVM Testnet
         BlastSepolia as u64, // Blast Sepolia
         Mode as u64,         // Mode Mainnet
+        Linea as u64,        // Linea Mainet
         #[cfg(test)]
         31337, // Anvil
     ]
